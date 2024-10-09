@@ -81,11 +81,19 @@ exports.protect = catchAsync(async (req, res, next) => {
 
   const user = await User.findOne({ _id: payload.id });
   if (!user) {
-    throw new Error('The user belonging to this token does no longer exist.');
+    return next(
+      new AppError(
+        'The user belonging to this token does no longer exist.',
+        401,
+      ),
+    );
   }
 
   if (user.changedPasswordAfter(payload.iat)) {
-    throw new Error('The use recently changed password! please log in again.');
+    return new AppError(
+      'The use recently changed password! please log in again.',
+      400,
+    );
   }
 
   req.user = user;
@@ -165,7 +173,7 @@ exports.updatePassword = catchAsync(async (req, res, next) => {
   const password = req.body.password;
   const passwordConfirm = req.body.passwordConfirm;
 
-  if (!user.correctPassword(currentPassword, user.password)) {
+  if (!(await user.correctPassword(currentPassword, user.password))) {
     return next(
       new AppError(
         "The Current password doesn't Correct! Please try again",
@@ -176,7 +184,7 @@ exports.updatePassword = catchAsync(async (req, res, next) => {
 
   user.password = password;
   user.passwordConfirm = passwordConfirm;
-  await user.save({ validateBeforeSave: false });
+  await user.save();
 
   createSendToken(user, 200, req, res);
 });
